@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "StudyGuard",
+  "version": "0.1.0",
+  "description": "Encourages real learning by intercepting 'do my homework' requests on AI chat sites and suggesting better ways to ask.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "StudyGuard",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": ["src/heuristics.js", "src/reveals.js", "src/suggestions.js", "src/overlay.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

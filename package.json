@@ -1,0 +1,9 @@
+{
+  "name": "studyguard-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StudyGuard homework-blocker Chrome extension",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
