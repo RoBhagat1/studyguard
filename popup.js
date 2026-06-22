@@ -1,8 +1,8 @@
 const DEFAULTS = {
   sg_enabled: true,
   sg_strictness: 'llm',
-  sg_proxyBase: '',
-  sg_extToken: '',
+  sg_proxyBase: 'https://proxy-red-one-41.vercel.app',
+  sg_extToken: 'c7800af89c3fe3f16daec547d7488eed56562cfae8ff7170',
   sg_unlockCode: 'STUDYGUARD',
   sg_refillAmount: 5,
   sg_revealsRemaining: 5

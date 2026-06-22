@@ -1,11 +1,12 @@
 // StudyGuard background service worker — thin client to the Vercel classify proxy.
 
-const DEFAULT_PROXY_BASE = ''; // set to your Vercel URL, e.g. 'https://studyguard-proxy.vercel.app'
+const DEFAULT_PROXY_BASE = 'https://proxy-red-one-41.vercel.app';
+const DEFAULT_EXT_TOKEN = 'c7800af89c3fe3f16daec547d7488eed56562cfae8ff7170';
 const DEFAULTS = {
   sg_enabled: true,
   sg_strictness: 'llm',     // 'heuristics' = no proxy calls; 'llm' = use proxy for ambiguous
   sg_proxyBase: DEFAULT_PROXY_BASE,
-  sg_extToken: ''
+  sg_extToken: DEFAULT_EXT_TOKEN
 };
 
 function getConfig() {
