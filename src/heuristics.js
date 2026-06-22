@@ -1,7 +1,9 @@
 (function (global) {
+  // `(?:[\w-]+\s+){0,3}?` allows up to 3 modifier words between the determiner and the
+  // noun, so "my 5-paragraph essay" / "my AP world history homework" still match.
   const CHEATING_PATTERNS = [
-    /\b(do|finish|complete|write)\s+(my|this|the)\s+(homework|assignment|essay|paper|report|project|worksheet|problem\s*set|discussion\s*post)\b/i,
-    /\bwrite\s+(me\s+)?(an?|the)\s+(essay|paper|report|paragraph|story|discussion\s*post)\b/i,
+    /\b(do|finish|complete|write|answer)\s+(my|our|this|the)\s+(?:[\w-]+\s+){0,3}?(homework|assignment|essay|paper|report|project|worksheet|problem\s*sets?|discussion\s*post|questions?|quiz|test|exam|lab\s*report)\b/i,
+    /\bwrite\s+(me\s+)?(an?|the|my)\s+(?:[\w-]+\s+){0,3}?(essay|paper|report|paragraph|story|discussion\s*post)\b/i,
     /\bsolve\s+(this|these|the|my)\b[\s\S]*\b(problem\s*set|problems|equations?|questions?)\b/i,
     /\b(answer|answers)\s+(these|the|to|all)\b[\s\S]*\b(questions?|worksheet|quiz|test|exam|problems)\b/i,
     /\bjust\s+give\s+me\s+the\s+(answer|answers|solution|solutions|code)\b/i,

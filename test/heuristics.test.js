@@ -8,6 +8,12 @@ test('clear cheating request -> hit', () => {
   assert.equal(classifyPromptHeuristically('just give me the answers to these questions').verdict, 'hit');
 });
 
+test('cheating request with modifiers between determiner and noun -> hit', () => {
+  assert.equal(classifyPromptHeuristically('write my 5-paragraph essay on the causes of World War 1').verdict, 'hit');
+  assert.equal(classifyPromptHeuristically('do my AP world history homework').verdict, 'hit');
+  assert.equal(classifyPromptHeuristically('finish my chemistry lab report').verdict, 'hit');
+});
+
 test('clear learning request -> miss', () => {
   assert.equal(classifyPromptHeuristically('Explain how photosynthesis works so I understand it').verdict, 'miss');
   assert.equal(classifyPromptHeuristically('give me a hint, not the answer').verdict, 'miss');
