@@ -2,15 +2,14 @@
 // Detects "do my homework" requests on ChatGPT and Claude, then blurs the assistant's
 // answer and offers learning-oriented prompt suggestions.
 
-const QUIET_PERIOD_MS = 1500;
+const EVAL_DELAY_MS = 200;   // throttle window — blur fires within this of the first streamed token
 const COMPLETION_POLL_MS = 1000;
 const TURN_NODE_SELECTOR = "[data-message-author-role]";
 
 const state = {
   observer: null,
   analyzeTimer: null,
-  completionPollTimer: null,
-  lastMutationAt: 0
+  completionPollTimer: null
 };
 
 // --- Site adapters: locate prompts/responses on each supported chat site ---
@@ -275,19 +274,21 @@ function sgLog(...args) {
 
 async function evaluateLatestTurn() {
   if (!isSupportedSite()) { sgLog("skip: unsupported site"); return; }
-  if (isGenerationInProgress()) { sgLog("skip: still generating"); return; }
+
+  // We act as soon as an answer starts streaming (the prompt is already complete,
+  // and detection is prompt-based) so the answer never becomes readable. No waiting
+  // for generation to finish.
+  const pair = getLatestPromptResponsePair();
+  if (!pair || !pair.prompt || !pair.response || !pair.responseNode) { sgLog("skip: no prompt/response pair yet"); return; }
+
+  // Claim this response node synchronously (before any await) so each turn is
+  // evaluated exactly once despite the burst of streaming mutations.
+  if (sgSeenResponseNodes.has(pair.responseNode)) { sgLog("skip: already evaluated this response node"); return; }
+  sgSeenResponseNodes.add(pair.responseNode);
+  sgLog("evaluating turn. prompt:", pair.prompt.slice(0, 120));
 
   const cfg = await sgSendMessage({ type: "STUDYGUARD_GET_CONFIG" });
   if (cfg && cfg.enabled === false) { sgLog("skip: disabled in config"); return; }
-
-  const pair = getLatestPromptResponsePair();
-  if (!pair || !pair.prompt || !pair.response) { sgLog("skip: no prompt/response pair", pair); return; }
-  sgLog("pair found. prompt:", pair.prompt.slice(0, 120));
-
-  if (pair.responseNode) {
-    if (sgSeenResponseNodes.has(pair.responseNode)) { sgLog("skip: already evaluated this response node"); return; }
-    sgSeenResponseNodes.add(pair.responseNode);
-  }
 
   const heur = self.StudyGuardHeuristics.classifyPromptHeuristically(pair.prompt);
   sgLog("heuristic verdict:", heur.verdict);
@@ -345,24 +346,20 @@ async function evaluateLatestTurn() {
   });
 }
 
-// --- Observe the conversation and re-evaluate when a turn settles ---
+// --- Observe the conversation and re-evaluate as answers stream in ---
 
+// Throttle (not trailing-debounce): a burst of streaming mutations triggers a run
+// at most once per EVAL_DELAY_MS, with a leading run shortly after the first token —
+// so the blur lands while the answer is still streaming rather than after it ends.
 function scheduleEvaluation() {
-  state.lastMutationAt = Date.now();
-
   if (state.analyzeTimer) {
-    window.clearTimeout(state.analyzeTimer);
+    return;
   }
 
   state.analyzeTimer = window.setTimeout(() => {
-    const elapsed = Date.now() - state.lastMutationAt;
-    if (elapsed < QUIET_PERIOD_MS) {
-      scheduleEvaluation();
-      return;
-    }
-
+    state.analyzeTimer = null;
     void evaluateLatestTurn();
-  }, QUIET_PERIOD_MS);
+  }, EVAL_DELAY_MS);
 }
 
 function shouldUseCompletionPoller() {
