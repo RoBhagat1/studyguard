@@ -228,11 +228,11 @@ function isGenerationInProgress() {
 
 // --- Detection + intervention orchestration ---
 
-const sgState = { lastFingerprint: null };
-
-function sgFingerprint(prompt, response) {
-  return `${(prompt || "").length}:${(response || "").slice(0, 64)}`;
-}
+// Track which response DOM nodes we've already evaluated, so repeated observer
+// fires (and identical re-asked questions, which are new nodes) are each handled
+// exactly once. Keyed by node identity, not content — so asking the same thing
+// twice is two separate turns and both get checked.
+const sgSeenResponseNodes = new WeakSet();
 
 function sgGetRevealState() {
   return new Promise((resolve) => {
@@ -268,20 +268,29 @@ function sgSendMessage(message) {
   });
 }
 
+const SG_DEBUG = true;
+function sgLog(...args) {
+  if (SG_DEBUG) console.warn("[StudyGuard]", ...args);
+}
+
 async function evaluateLatestTurn() {
-  if (!isSupportedSite() || isGenerationInProgress()) return;
+  if (!isSupportedSite()) { sgLog("skip: unsupported site"); return; }
+  if (isGenerationInProgress()) { sgLog("skip: still generating"); return; }
 
   const cfg = await sgSendMessage({ type: "STUDYGUARD_GET_CONFIG" });
-  if (cfg && cfg.enabled === false) return;
+  if (cfg && cfg.enabled === false) { sgLog("skip: disabled in config"); return; }
 
   const pair = getLatestPromptResponsePair();
-  if (!pair || !pair.prompt || !pair.response) return;
+  if (!pair || !pair.prompt || !pair.response) { sgLog("skip: no prompt/response pair", pair); return; }
+  sgLog("pair found. prompt:", pair.prompt.slice(0, 120));
 
-  const fp = sgFingerprint(pair.prompt, pair.response);
-  if (fp === sgState.lastFingerprint) return;
-  sgState.lastFingerprint = fp;
+  if (pair.responseNode) {
+    if (sgSeenResponseNodes.has(pair.responseNode)) { sgLog("skip: already evaluated this response node"); return; }
+    sgSeenResponseNodes.add(pair.responseNode);
+  }
 
   const heur = self.StudyGuardHeuristics.classifyPromptHeuristically(pair.prompt);
+  sgLog("heuristic verdict:", heur.verdict);
   let isHomework = heur.verdict === "hit";
   let llmSuggestions = null;
   const llmEnabled = !cfg || cfg.strictness === "llm";
@@ -299,7 +308,7 @@ async function evaluateLatestTurn() {
     }
   }
 
-  if (!isHomework) return;
+  if (!isHomework) { sgLog("not homework — leaving answer visible"); return; }
 
   const adapter = getActiveAdapter();
   const responseNode = pair.responseNode || getLastTurnNode("assistant");
@@ -307,7 +316,8 @@ async function evaluateLatestTurn() {
     adapter && typeof adapter.getResponseMountNode === "function" && responseNode
       ? adapter.getResponseMountNode(responseNode)
       : responseNode;
-  if (!mount) return; // DOM changed; skip silently
+  if (!mount) { sgLog("skip: no response node to blur"); return; }
+  sgLog("BLOCKING answer, mount:", mount.tagName, mount.className);
 
   const suggestions = self.StudyGuardSuggestions.pickSuggestions(llmSuggestions);
   const rev = await sgGetRevealState();
@@ -459,8 +469,10 @@ function installCompletionPoller() {
 
 function init() {
   if (!isSupportedSite()) {
+    sgLog("init: not a supported site:", location.hostname);
     return;
   }
+  sgLog("init: active on", location.hostname, "adapter:", getActiveAdapter() && getActiveAdapter().id);
 
   installMutationObserver();
   installCompletionPoller();
