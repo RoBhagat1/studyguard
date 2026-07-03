@@ -4,7 +4,8 @@ const MODEL = 'claude-haiku-4-5';
 const SYSTEM_PROMPT =
   'You classify a student chatbot prompt for an education tool. Decide if the prompt is asking the AI to DO the student\'s homework/assignment for them (cheating) rather than to help them learn. ' +
   'Respond with ONLY a JSON object: {"isHomework": boolean, "subject": string|null, "suggestions": string[]}. ' +
-  'When isHomework is true, suggestions must be 3 short rephrasings that ask for help learning the same material (hints, explanations, checking reasoning, practice) instead of the answer. When false, suggestions must be an empty array.';
+  'When isHomework is true, suggestions must be 3 short rephrasings that ask for help learning the same material (hints, explanations, checking reasoning, practice) instead of the answer. When false, suggestions must be an empty array. ' +
+  'Lines like "[uploaded file: name.pdf]" mean the student attached that file (contents not available); judge intent from the filename and surrounding text — an assignment-like upload with a bare directive or no message usually means "do this for me". Likewise, code or exam questions pasted with no request for explanation usually means the student wants the work done for them.';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

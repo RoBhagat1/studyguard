@@ -14,6 +14,40 @@ const state = {
 
 // --- Site adapters: locate prompts/responses on each supported chat site ---
 
+// Filenames of uploaded attachments are scraped from the user turn and appended to the
+// prompt as "[uploaded file: name.pdf]" markers, so the heuristics and the LLM
+// classifier can reason about uploads (including uploads with no message text).
+const SG_FILENAME_RE = /^[\w .()\[\]&+-]{1,80}\.(pdf|docx?|txt|rtf|odt|md|csv|tsv|xlsx?|pptx?|png|jpe?g|gif|webp|heic|py|ipynb|java|cpp|cc|c|h|js|ts|jsx|tsx|html|css|json|zip)$/i;
+
+function sgExtractFilenames(scope) {
+  if (!(scope instanceof Element)) {
+    return [];
+  }
+
+  const names = new Set();
+  for (const el of scope.querySelectorAll("*")) {
+    if (el.closest(".studyguard-panel")) {
+      continue;
+    }
+
+    for (const attr of ["aria-label", "title", "alt"]) {
+      const value = el.getAttribute(attr);
+      if (value && SG_FILENAME_RE.test(value.trim())) {
+        names.add(value.trim());
+      }
+    }
+
+    if (el.childElementCount === 0) {
+      const text = (el.textContent || "").trim();
+      if (text && SG_FILENAME_RE.test(text)) {
+        names.add(text);
+      }
+    }
+  }
+
+  return Array.from(names).slice(0, 5);
+}
+
 function createChatGptAdapter() {
   return {
     id: "chatgpt",
@@ -39,6 +73,13 @@ function createChatGptAdapter() {
     },
     getTurnText(node) {
       return getGenericNodeText(node);
+    },
+    getAttachments(userNode) {
+      if (!userNode) {
+        return [];
+      }
+      // Attachment chips render inside the same turn container as the message text.
+      return sgExtractFilenames(userNode.closest("article") || userNode.parentElement || userNode);
     },
     isGenerationInProgress() {
       const buttons = Array.from(document.querySelectorAll("button"));
@@ -90,6 +131,16 @@ function createClaudeAdapter() {
       }
 
       return getGenericNodeText(node);
+    },
+    getAttachments(userNode) {
+      if (!userNode) {
+        return [];
+      }
+      // On claude.ai file thumbnails render as siblings of the user-message div,
+      // inside the same message group.
+      return sgExtractFilenames(
+        userNode.closest("[data-test-render-count]") || userNode.parentElement || userNode
+      );
     },
     isIgnoredMutationNode(node) {
       if (!(node instanceof Element)) {
@@ -196,6 +247,22 @@ function getTranscriptEntries() {
   return adapter && typeof adapter.getTranscriptEntries === "function" ? adapter.getTranscriptEntries() : [];
 }
 
+function getAttachmentMarkers(userNode) {
+  const adapter = getActiveAdapter();
+  if (!adapter || typeof adapter.getAttachments !== "function" || !userNode) {
+    return "";
+  }
+
+  let names = [];
+  try {
+    names = adapter.getAttachments(userNode) || [];
+  } catch (e) {
+    names = [];
+  }
+
+  return names.map((name) => `[uploaded file: ${name}]`).join("\n");
+}
+
 function getLatestPromptResponsePair() {
   const transcriptEntries = getTranscriptEntries();
   if (transcriptEntries.length < 2) {
@@ -212,9 +279,12 @@ function getLatestPromptResponsePair() {
     return null;
   }
 
+  const promptText = getNodeText(promptEntry.node || null, "user");
+  const markers = getAttachmentMarkers(promptEntry.node || null);
+
   return {
     promptNode: promptEntry.node || null,
-    prompt: getNodeText(promptEntry.node || null, "user"),
+    prompt: markers ? `${promptText}\n${markers}`.trim() : promptText,
     responseNode: responseEntry.node || null,
     response: getNodeText(responseEntry.node || null, "assistant")
   };
