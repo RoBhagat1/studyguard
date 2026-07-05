@@ -84,6 +84,31 @@ test('attachment plus directive -> hit', () => {
   assert.equal(classifyPromptHeuristically('do question 3\n[uploaded file: scan.pdf]').verdict, 'hit');
 });
 
+test('scaffold code with TODO comment -> hit', () => {
+  const paste = [
+    '# TODO: Create a stacked bar plot of the label counts per cluster.',
+    "cluster_label_group = kmeans_df.groupby(['cluster','label']).size()",
+    'cluster_label_counts = cluster_label_group.unstack(fill_value = 0)',
+    'cluster_label_counts.plot(',
+    "    kind='bar',",
+    "    title='Distribution of True Labels in Each K-means Cluster'",
+    ')'
+  ].join('\n');
+  assert.equal(classifyPromptHeuristically(paste).verdict, 'hit');
+  const jsScaffold = '// TODO: implement the sort\nconst items = load();\nitems.sort();';
+  assert.equal(classifyPromptHeuristically(jsScaffold).verdict, 'hit');
+});
+
+test('scaffold TODO with learning framing -> not hit', () => {
+  const paste = 'can you explain how groupby works in this?\n# TODO: Create a stacked bar plot.\ndf2 = df.groupby(["a"]).size()\ncounts = df2.unstack(fill_value = 0)';
+  assert.notEqual(classifyPromptHeuristically(paste).verdict, 'hit');
+});
+
+test('assignment-style code paste without TODO -> ambiguous', () => {
+  const paste = "cluster_label_group = kmeans_df.groupby(['cluster','label']).size()\ncluster_label_counts = cluster_label_group.unstack(fill_value = 0)\ncluster_label_counts.plot(kind='bar')";
+  assert.equal(classifyPromptHeuristically(paste).verdict, 'ambiguous');
+});
+
 test('attachment with learning framing -> not hit', () => {
   const prompt = 'can you explain the concepts in this?\n[uploaded file: hw3.pdf]';
   assert.notEqual(classifyPromptHeuristically(prompt).verdict, 'hit');

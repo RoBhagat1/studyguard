@@ -45,14 +45,26 @@
     return HOMEWORK_FILENAME_RE.test(name.replace(/[_\-.]/g, ' '));
   }
 
-  const CODE_LINE_RE = /(;\s*$|[{}]\s*$|\breturn\b|^\s*(def |function |print\s*\(|console\.|import |from\s+\S+\s+import|#include|class |const |let |var |if\s*\(|for\s*\(|while\s*\())/;
+  const CODE_LINE_RE = /(;\s*$|[{}]\s*$|\breturn\b|^\s*(def |function |print\s*\(|console\.|import |from\s+\S+\s+import|#include|class |const |let |var |if\s*\(|for\s*\(|while\s*\()|^\s*#\s|^\s*[A-Za-z_][\w.\[\]'"]*\s*=\s*\S|\b\w+\.\w+\s*\()/;
 
-  function detectCodePaste(text) {
+  function countCodeLines(text) {
     let codeLines = 0;
     for (const line of text.split('\n')) {
       if (line.trim() && CODE_LINE_RE.test(line)) codeLines += 1;
     }
-    return codeLines >= 3;
+    return codeLines;
+  }
+
+  function detectCodePaste(text) {
+    return countCodeLines(text) >= 3;
+  }
+
+  // Instructor-provided skeleton code: a TODO/FIXME comment plus code lines means
+  // "complete this for me".
+  const SCAFFOLD_TODO_RE = /^\s*(#|\/\/)\s*(todo|fixme|your\s+code\s+here)\b/im;
+
+  function detectScaffoldTodo(text) {
+    return SCAFFOLD_TODO_RE.test(text) && countCodeLines(text) >= 2;
   }
 
   // "(10 marks)" / "(5 points)" — a pasted exam question
@@ -83,6 +95,10 @@
     if (attachments.some(isHomeworkFilename)) {
       cheatingHits += 1;
       matched.push('attachment:homework-filename');
+    }
+    if (detectScaffoldTodo(text)) {
+      cheatingHits += 1;
+      matched.push('code-scaffold-todo');
     }
 
     if (cheatingHits > 0 && learningHits === 0) {

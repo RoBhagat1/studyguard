@@ -98,12 +98,11 @@ function createClaudeAdapter() {
       return window.location.hostname === "claude.ai";
     },
     getConversationContainer() {
-      const inputContainer = document.querySelector('[data-chat-input-container="true"]');
-      if (inputContainer && inputContainer.previousElementSibling instanceof Element) {
-        return inputContainer.previousElementSibling;
-      }
-
-      return (inputContainer && inputContainer.parentElement) || document.querySelector("main");
+      // claude.ai is an SPA that rebuilds the chat area on navigation, so any node
+      // picked near the input box can go stale and the observer stops seeing streamed
+      // turns (observed in the wild: zero observer fires during a 26s stream). Observe
+      // body — the mutation filter plus the 200ms throttle keep the cost negligible.
+      return document.body;
     },
     getResponseMountNode(responseNode) {
       return responseNode ? responseNode.querySelector(".font-claude-response") || responseNode : responseNode;
@@ -204,7 +203,9 @@ function getGenericNodeText(node) {
     injectedNode.remove();
   }
 
-  return clone.innerText.replace(/\s+/g, " ").trim();
+  // Preserve line breaks: the code-paste and problem-dump detectors are line-based,
+  // so collapsing newlines would blind them to pasted code and numbered questions.
+  return clone.innerText.replace(/[^\S\n]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 }
 
 function getClaudeAssistantText(node) {
@@ -367,17 +368,15 @@ async function evaluateLatestTurn() {
   const llmEnabled = !cfg || cfg.strictness === "llm";
 
   if (heur.verdict === "ambiguous" && llmEnabled) {
+    // Verdict genuinely unknown — the LLM round trip is unavoidable here.
     const res = await sgSendMessage({ type: "STUDYGUARD_CLASSIFY", prompt: pair.prompt });
     if (res && res.ok) {
       isHomework = res.isHomework === true;
       llmSuggestions = res.suggestions;
     }
-  } else if (heur.verdict === "hit" && llmEnabled) {
-    const res = await sgSendMessage({ type: "STUDYGUARD_CLASSIFY", prompt: pair.prompt });
-    if (res && res.ok && Array.isArray(res.suggestions) && res.suggestions.length) {
-      llmSuggestions = res.suggestions;
-    }
   }
+  // On a heuristic hit the verdict is already decided: blur immediately with the
+  // static suggestions and upgrade the panel when the LLM's tailored ones arrive.
 
   if (!isHomework) { sgLog("not homework — leaving answer visible"); return; }
 
@@ -392,6 +391,14 @@ async function evaluateLatestTurn() {
 
   const suggestions = self.StudyGuardSuggestions.pickSuggestions(llmSuggestions);
   const rev = await sgGetRevealState();
+
+  if (heur.verdict === "hit" && llmEnabled) {
+    void sgSendMessage({ type: "STUDYGUARD_CLASSIFY", prompt: pair.prompt }).then((res) => {
+      if (res && res.ok && Array.isArray(res.suggestions) && res.suggestions.length) {
+        self.StudyGuardOverlay.updateSuggestions(mount, self.StudyGuardSuggestions.pickSuggestions(res.suggestions));
+      }
+    });
+  }
 
   self.StudyGuardOverlay.applyBlock(mount, {
     suggestions,
@@ -526,10 +533,9 @@ function installCompletionPoller() {
       return;
     }
 
-    if (isGenerationInProgress()) {
-      return;
-    }
-
+    // Evaluate during streaming too — detection is prompt-based and each response
+    // node is only evaluated once, so polling mid-generation is safe and means the
+    // blur lands within ~1s even if the mutation observer misses the turn.
     void evaluateLatestTurn();
   }, COMPLETION_POLL_MS);
 }

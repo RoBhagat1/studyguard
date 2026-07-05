@@ -121,5 +121,18 @@
     }
   }
 
-  global.StudyGuardOverlay = { applyBlock, clearBlock, isBlocked, showLockScreen };
+  // Swap the suggestion list on an already-mounted panel (e.g. when tailored LLM
+  // suggestions arrive after the blur was applied). No-op if the block was cleared
+  // or the panel is showing the lock screen.
+  function updateSuggestions(node, suggestions, onCopy) {
+    if (!(node instanceof HTMLElement) || !node.parentElement) return false;
+    const panel = node.parentElement.querySelector(`.${PANEL_CLASS}`);
+    if (!panel) return false;
+    const list = panel.querySelector('.studyguard-suggestions');
+    if (!list) return false;
+    list.replaceWith(buildSuggestionList(suggestions, onCopy));
+    return true;
+  }
+
+  global.StudyGuardOverlay = { applyBlock, clearBlock, isBlocked, showLockScreen, updateSuggestions };
 })(typeof self !== 'undefined' ? self : globalThis);
