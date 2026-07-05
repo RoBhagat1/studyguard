@@ -105,6 +105,19 @@
     panel.appendChild(body);
     panel.appendChild(revealBtn);
 
+    // TRAIN mode: let the tester mark a false positive; unblurs without a reveal.
+    if (typeof opts.onFalsePositive === 'function') {
+      const fpBtn = document.createElement('button');
+      fpBtn.type = 'button';
+      fpBtn.className = 'studyguard-train-fp';
+      fpBtn.textContent = "Train: shouldn't be blocked";
+      fpBtn.addEventListener('click', () => {
+        opts.onFalsePositive();
+        clearBlock(node);
+      });
+      panel.appendChild(fpBtn);
+    }
+
     // mount after the response node within its parent
     if (node.parentElement) node.parentElement.insertBefore(panel, node.nextSibling);
 
@@ -134,5 +147,22 @@
     return true;
   }
 
-  global.StudyGuardOverlay = { applyBlock, clearBlock, isBlocked, showLockScreen, updateSuggestions };
+  // TRAIN mode: small badge under an unblocked response to report a false negative.
+  function addTrainBadge(node, onReport) {
+    if (!(node instanceof HTMLElement) || !node.parentElement) return;
+    if (node.getAttribute('data-studyguard-train-badge') === 'true') return;
+    node.setAttribute('data-studyguard-train-badge', 'true');
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.className = 'studyguard-train-badge studyguard-panel';
+    badge.textContent = 'SG train: should have been flagged?';
+    badge.addEventListener('click', () => {
+      if (typeof onReport === 'function') onReport();
+      badge.textContent = 'reported ✓';
+      badge.disabled = true;
+    });
+    node.parentElement.insertBefore(badge, node.nextSibling);
+  }
+
+  global.StudyGuardOverlay = { applyBlock, clearBlock, isBlocked, showLockScreen, updateSuggestions, addTrainBadge };
 })(typeof self !== 'undefined' ? self : globalThis);

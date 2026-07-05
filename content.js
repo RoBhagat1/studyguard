@@ -322,6 +322,21 @@ function sgSetRevealsRemaining(n) {
   return new Promise((resolve) => chrome.storage.local.set({ sg_revealsRemaining: n }, resolve));
 }
 
+function sgGetTrainMode() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ sg_trainMode: false }, (s) => resolve(Boolean(s.sg_trainMode)));
+  });
+}
+
+function sgSaveTrainFeedback(record) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ sg_trainFeedback: [] }, (s) => {
+      const next = self.StudyGuardTraining.addFeedback(s.sg_trainFeedback, record);
+      chrome.storage.local.set({ sg_trainFeedback: next }, resolve);
+    });
+  });
+}
+
 function sgSendMessage(message) {
   return new Promise((resolve) => {
     try {
@@ -378,14 +393,35 @@ async function evaluateLatestTurn() {
   // On a heuristic hit the verdict is already decided: blur immediately with the
   // static suggestions and upgrade the panel when the LLM's tailored ones arrive.
 
-  if (!isHomework) { sgLog("not homework — leaving answer visible"); return; }
-
   const adapter = getActiveAdapter();
   const responseNode = pair.responseNode || getLastTurnNode("assistant");
   const mount =
     adapter && typeof adapter.getResponseMountNode === "function" && responseNode
       ? adapter.getResponseMountNode(responseNode)
       : responseNode;
+
+  const trainMode = await sgGetTrainMode();
+  const recordFeedback = (label) => {
+    const rec = self.StudyGuardTraining.buildFeedbackRecord({
+      label,
+      prompt: pair.prompt,
+      verdict: heur.verdict,
+      matched: heur.matched,
+      llmUsed: llmEnabled,
+      site: adapter ? adapter.id : null
+    });
+    if (rec) void sgSaveTrainFeedback(rec);
+    sgLog("train feedback recorded:", label);
+  };
+
+  if (!isHomework) {
+    if (trainMode && mount) {
+      self.StudyGuardOverlay.addTrainBadge(mount, () => recordFeedback("false_negative"));
+    }
+    sgLog("not homework — leaving answer visible");
+    return;
+  }
+
   if (!mount) { sgLog("skip: no response node to blur"); return; }
   sgLog("BLOCKING answer, mount:", mount.tagName, mount.className);
 
@@ -403,6 +439,7 @@ async function evaluateLatestTurn() {
   self.StudyGuardOverlay.applyBlock(mount, {
     suggestions,
     initialRevealsRemaining: rev.revealsRemaining,
+    onFalsePositive: trainMode ? () => recordFeedback("false_positive") : undefined,
     onReveal: async () => {
       const cur = await sgGetRevealState();
       if (cur.revealsRemaining > 0) {

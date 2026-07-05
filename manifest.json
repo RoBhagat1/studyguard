@@ -21,7 +21,7 @@
         "https://chat.openai.com/*",
         "https://claude.ai/*"
       ],
-      "js": ["src/heuristics.js", "src/reveals.js", "src/suggestions.js", "src/overlay.js", "content.js"],
+      "js": ["src/heuristics.js", "src/reveals.js", "src/suggestions.js", "src/training.js", "src/overlay.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

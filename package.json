@@ -4,6 +4,7 @@
   "private": true,
   "description": "StudyGuard homework-blocker Chrome extension",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "train:report": "node scripts/train-report.js"
   }
 }

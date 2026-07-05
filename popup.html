@@ -44,9 +44,19 @@
     <input type="number" id="refillAmount" min="0" />
   </fieldset>
 
+  <fieldset>
+    <legend>Training</legend>
+    <label class="row"><input type="checkbox" id="trainMode" /> Train mode (mark wrong verdicts on the page)</label>
+    <div class="row" style="margin-top:8px">
+      <button id="exportTrain" type="button">Export training data (0)</button>
+      <button id="clearTrain" type="button">Clear</button>
+    </div>
+  </fieldset>
+
   <button id="save" type="button">Save</button>
   <div class="saved" id="savedMsg"></div>
 
+  <script src="src/training.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

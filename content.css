@@ -31,3 +31,16 @@
 .studyguard-unlock-err { color: #c0392b; font-size: 12px; margin-top: 6px; min-height: 14px; }
 .studyguard-lock-msg { font-size: 13px; margin: 0 0 10px; }
 .studyguard-form-link { display: inline-block; margin-top: 10px; font-size: 13px; }
+.studyguard-train-fp {
+  cursor: pointer; display: block; margin-top: 10px;
+  border: 1px dashed #c0392b; border-radius: 8px; background: #fff;
+  color: #c0392b; padding: 4px 10px; font-size: 12px;
+}
+/* Also carries .studyguard-panel (so text extraction and the mutation filter skip it);
+   these overrides undo the big panel chrome. */
+.studyguard-train-badge {
+  cursor: pointer; display: inline-block; margin: 4px 0 0;
+  padding: 2px 8px; border: 1px dashed #888; border-radius: 999px;
+  background: #fafafa; color: #555; font-size: 11px; max-width: none;
+}
+.studyguard-train-badge:disabled { cursor: default; color: #2e7d32; border-color: #2e7d32; }
